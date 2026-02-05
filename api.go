@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"sync/atomic"
 )
 
@@ -52,7 +53,13 @@ func validateChirpHandler(w http.ResponseWriter, r *http.Request) {
 		ErrorMsg string `json:"error"`
 	}
 	type jsonSuccess struct {
-		Valid bool `json:"valid"`
+		CleanedBody string `json:"cleaned_body"`
+	}
+
+	bad_words := map[string]struct{}{
+		"kerfuffle": struct{}{},
+		"sharbert":  struct{}{},
+		"fornax":    struct{}{},
 	}
 
 	decoder := json.NewDecoder(r.Body)
@@ -68,7 +75,17 @@ func validateChirpHandler(w http.ResponseWriter, r *http.Request) {
 		data, err = json.Marshal(jsonError{ErrorMsg: err.Error()})
 	} else {
 		status = http.StatusOK
-		data, err = json.Marshal(jsonSuccess{Valid: true})
+		cleaned_words := []string{}
+		for _, word := range strings.Split(params.Body, " ") {
+			if _, ok := bad_words[strings.ToLower(word)]; ok {
+				cleaned_words = append(cleaned_words, "****")
+			} else {
+				cleaned_words = append(cleaned_words, word)
+			}
+		}
+		data, err = json.Marshal(
+			jsonSuccess{CleanedBody: strings.Join(cleaned_words, " ")},
+		)
 	}
 	if err != nil {
 		log.Panicf("Error marshalling JSON: %s", err)
