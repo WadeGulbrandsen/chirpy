@@ -55,6 +55,32 @@ func (cfg *apiConfig) handleCreateChirp(w http.ResponseWriter, r *http.Request) 
 	respondWithJSON(w, http.StatusCreated, Chirp(dbChirp))
 }
 
+func (cfg *apiConfig) handleGetChirpByID(w http.ResponseWriter, r *http.Request) {
+	chipID, err := uuid.Parse(r.PathValue("chirpID"))
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid chirp ID", err)
+		return
+	}
+	dbChirp, err := cfg.dbQueries.GetChirpByID(r.Context(), chipID)
+	if err != nil {
+		respondWithError(w, http.StatusNotFound, "Couldn't get chirp", err)
+		return
+	}
+	respondWithJSON(w, http.StatusOK, Chirp(dbChirp))
+}
+
+func (cfg *apiConfig) handleGetChirps(w http.ResponseWriter, r *http.Request) {
+	dbChirps, err := cfg.dbQueries.GetChirps(r.Context())
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't get chirps", err)
+	}
+	chirps := []Chirp{}
+	for _, chirp := range dbChirps {
+		chirps = append(chirps, Chirp(chirp))
+	}
+	respondWithJSON(w, http.StatusOK, chirps)
+}
+
 func validateChirp(text string) (string, error) {
 	if len(text) > maxChirpLength {
 		return "", errors.New("Chirp is too long")
