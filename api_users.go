@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"log"
 	"net/http"
 	"time"
 
@@ -23,29 +22,13 @@ func (cfg *apiConfig) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 	params := parameters{}
 	err := json.NewDecoder(r.Body).Decode(&params)
 	if err != nil {
-		log.Printf("Error parsing JSON: %s", err)
-		w.WriteHeader(http.StatusInternalServerError)
+		respondWithError(w, http.StatusInternalServerError, "Couldn't decode parameters", err)
 		return
 	}
 	dbUser, err := cfg.dbQueries.CreateUser(r.Context(), params.Email)
 	if err != nil {
-		log.Printf("Error creating user: %s", err)
-		w.WriteHeader(http.StatusInternalServerError)
+		respondWithError(w, http.StatusInternalServerError, "Couldn't create user", err)
 		return
 	}
-	user := User{
-		ID:        dbUser.ID,
-		CreatedAt: dbUser.CreatedAt,
-		UpdatedAt: dbUser.CreatedAt,
-		Email:     dbUser.Email,
-	}
-	data, err := json.Marshal(user)
-	if err != nil {
-		log.Printf("Error marshalling JSON: %s", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	w.Write(data)
+	respondWithJSON(w, http.StatusCreated, User(dbUser))
 }
