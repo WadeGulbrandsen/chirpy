@@ -14,6 +14,7 @@ import (
 type apiConfig struct {
 	fileserverHits atomic.Int32
 	dbQueries      *database.Queries
+	platform       string
 }
 
 func handleHealthz(w http.ResponseWriter, r *http.Request) {
@@ -42,9 +43,17 @@ func (cfg *apiConfig) metricsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(html_text))
 }
 
-func (cfg *apiConfig) resetMetricsHandler(w http.ResponseWriter, r *http.Request) {
-	cfg.fileserverHits.Store(0)
+func (cfg *apiConfig) resetHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	if cfg.platform != "dev" {
+		w.WriteHeader(http.StatusForbidden)
+		return
+	}
+	if err := cfg.dbQueries.DeleteAllUsers(r.Context()); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	cfg.fileserverHits.Store(0)
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -91,7 +100,7 @@ func validateChirpHandler(w http.ResponseWriter, r *http.Request) {
 		)
 	}
 	if err != nil {
-		log.Panicf("Error marshalling JSON: %s", err)
+		log.Printf("Error marshalling JSON: %s", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}

@@ -24,6 +24,7 @@ func main() {
 	}
 	apiCfg := apiConfig{}
 	apiCfg.dbQueries = database.New(db)
+	apiCfg.platform = os.Getenv("PLATFORM")
 	apiCfg.fileserverHits.Store(0)
 	mux := http.NewServeMux()
 	mux.Handle(appPrefix, appHandler(&apiCfg))
@@ -32,8 +33,9 @@ func main() {
 		Handler: mux,
 	}
 	mux.HandleFunc("GET /admin/metrics", apiCfg.metricsHandler)
-	mux.HandleFunc("POST /admin/reset", apiCfg.resetMetricsHandler)
+	mux.HandleFunc("POST /admin/reset", apiCfg.resetHandler)
 	mux.HandleFunc("GET /api/healthz", handleHealthz)
+	mux.HandleFunc("POST /api/users", apiCfg.handleCreateUser)
 	mux.HandleFunc("POST /api/validate_chirp", validateChirpHandler)
 	log.Printf("Serving files from %s on port: %s\n", appDir, port)
 	log.Fatal(server.ListenAndServe())
