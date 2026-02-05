@@ -31,7 +31,9 @@ go.work.sum
 .idea/
 .vscode/
 
+# Builds
 out
+chirpy
 
 # REST Client files
 *.http

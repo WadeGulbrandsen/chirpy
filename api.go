@@ -7,10 +7,13 @@ import (
 	"net/http"
 	"strings"
 	"sync/atomic"
+
+	"github.com/WadeGulbrandsen/chirpy/internal/database"
 )
 
 type apiConfig struct {
 	fileserverHits atomic.Int32
+	dbQueries      *database.Queries
 }
 
 func handleHealthz(w http.ResponseWriter, r *http.Request) {
