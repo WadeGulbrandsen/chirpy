@@ -38,6 +38,7 @@ func main() {
 	mux.HandleFunc("GET /api/chirps/{chirpID}", apiCfg.handleGetChirpByID)
 	mux.HandleFunc("POST /api/chirps", apiCfg.handleCreateChirp)
 	mux.HandleFunc("GET /api/healthz", handleHealthz)
+	mux.HandleFunc("POST /api/login", apiCfg.handleLogin)
 	mux.HandleFunc("POST /api/users", apiCfg.handleCreateUser)
 	log.Printf("Serving files from %s on port: %s\n", appDir, port)
 	log.Fatal(server.ListenAndServe())
