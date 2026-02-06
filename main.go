@@ -42,6 +42,7 @@ func main() {
 	mux.HandleFunc("POST /api/refresh", cfg.handleRefresh)
 	mux.HandleFunc("POST /api/revoke", cfg.handleRevoke)
 	mux.HandleFunc("POST /api/users", cfg.handleCreateUser)
+	mux.HandleFunc("PUT /api/users", cfg.handleUpdateUser)
 
 	// Start the web server
 	server := &http.Server{
