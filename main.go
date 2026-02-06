@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"sync/atomic"
 
 	"github.com/WadeGulbrandsen/chirpy/internal/database"
 	"github.com/joho/godotenv"
@@ -14,6 +15,14 @@ import (
 const (
 	port = "8080"
 )
+
+type apiConfig struct {
+	fileserverHits atomic.Int32
+	dbQueries      *database.Queries
+	platform       string
+	tokenSecret    string
+	polkaKey       string
+}
 
 func main() {
 	// Get configuration
@@ -27,6 +36,7 @@ func main() {
 	cfg.dbQueries = database.New(db)
 	cfg.platform = os.Getenv("PLATFORM")
 	cfg.tokenSecret = os.Getenv("JWT_SECRET")
+	cfg.polkaKey = os.Getenv("POLKA_KEY")
 	cfg.fileserverHits.Store(0)
 
 	// Configure routes
@@ -40,6 +50,7 @@ func main() {
 	mux.HandleFunc("POST /api/chirps", cfg.handleCreateChirp)
 	mux.HandleFunc("GET /api/healthz", handleHealthz)
 	mux.HandleFunc("POST /api/login", cfg.handleLogin)
+	mux.HandleFunc("POST /api/polka/webhooks", cfg.handlePolkaWebhook)
 	mux.HandleFunc("POST /api/refresh", cfg.handleRefresh)
 	mux.HandleFunc("POST /api/revoke", cfg.handleRevoke)
 	mux.HandleFunc("POST /api/users", cfg.handleCreateUser)
