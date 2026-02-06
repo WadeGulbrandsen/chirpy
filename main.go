@@ -1,47 +1,19 @@
 package main
 
 import (
-	"database/sql"
+	"fmt"
 	"log"
 	"net/http"
-	"os"
-	"sync/atomic"
 
-	"github.com/WadeGulbrandsen/chirpy/internal/database"
-	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 )
 
-const (
-	port = "8080"
-)
-
-type apiConfig struct {
-	fileserverHits atomic.Int32
-	dbQueries      *database.Queries
-	platform       string
-	tokenSecret    string
-	polkaKey       string
-}
-
 func main() {
-	// Get configuration
-	godotenv.Load()
-	dbURL := os.Getenv("DB_URL")
-	db, err := sql.Open("postgres", dbURL)
-	if err != nil {
-		log.Fatal("Could not open database connection")
-	}
-	cfg := apiConfig{}
-	cfg.dbQueries = database.New(db)
-	cfg.platform = os.Getenv("PLATFORM")
-	cfg.tokenSecret = os.Getenv("JWT_SECRET")
-	cfg.polkaKey = os.Getenv("POLKA_KEY")
-	cfg.fileserverHits.Store(0)
+	cfg := getConfig()
 
 	// Configure routes
 	mux := http.NewServeMux()
-	mux.Handle(appPrefix, appHandler(&cfg))
+	mux.Handle(cfg.appPrefix, appHandler(cfg))
 	mux.HandleFunc("GET /admin/metrics", cfg.metricsHandler)
 	mux.HandleFunc("POST /admin/reset", cfg.resetHandler)
 	mux.HandleFunc("GET /api/chirps", cfg.handleGetChirps)
@@ -58,10 +30,11 @@ func main() {
 
 	// Start the web server
 	server := &http.Server{
-		Addr:    ":" + port,
+		Addr:    fmt.Sprintf(":%d", cfg.port),
 		Handler: mux,
 	}
 
-	log.Printf("Serving files from %s on port: %s\n", appDir, port)
+	log.Printf("Chirpy API running on port: %d\n", cfg.port)
+	log.Printf("Serving directory %q at: %d%s\n", cfg.appPath, cfg.port, cfg.appPrefix)
 	log.Fatal(server.ListenAndServe())
 }

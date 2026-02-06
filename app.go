@@ -1,16 +1,13 @@
 package main
 
-import "net/http"
-
-const (
-	app_path  = "."
-	appDir    = http.Dir(app_path)
-	appPrefix = "/app/"
+import (
+	"net/http"
 )
 
-func appHandler(apiCfg *apiConfig) http.Handler {
+func appHandler(cfg *apiConfig) http.Handler {
+	appDir := http.Dir(cfg.appPath)
 	return http.StripPrefix(
-		appPrefix,
-		apiCfg.middlewareMetricsInc(http.FileServer(appDir)),
+		cfg.appPrefix,
+		cfg.middlewareMetricsInc(http.FileServer(appDir)),
 	)
 }
