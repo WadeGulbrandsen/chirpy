@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/WadeGulbrandsen/chirpy/internal/auth"
 	"github.com/WadeGulbrandsen/chirpy/internal/database"
 	"github.com/google/uuid"
 )
@@ -25,14 +26,25 @@ const (
 
 func (cfg *apiConfig) handleCreateChirp(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
-		Body   string    `json:"body"`
-		UserID uuid.UUID `json:"user_id"`
+		Body string `json:"body"`
 	}
 
 	params := parameters{}
 	err := json.NewDecoder(r.Body).Decode(&params)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Couldn't decode parameters", err)
+		return
+	}
+
+	token, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Please login first", err)
+		return
+	}
+
+	user_id, err := auth.ValidateJWT(token, cfg.tokenSecret)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Please login first", err)
 		return
 	}
 
@@ -46,7 +58,7 @@ func (cfg *apiConfig) handleCreateChirp(w http.ResponseWriter, r *http.Request) 
 		r.Context(),
 		database.CreateChirpParams{
 			Body:   body,
-			UserID: params.UserID,
+			UserID: user_id,
 		})
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Couldn't create chirp", err)

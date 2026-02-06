@@ -16,30 +16,39 @@ const (
 )
 
 func main() {
+	// Get configuration
 	godotenv.Load()
 	dbURL := os.Getenv("DB_URL")
 	db, err := sql.Open("postgres", dbURL)
 	if err != nil {
 		log.Fatal("Could not open database connection")
 	}
-	apiCfg := apiConfig{}
-	apiCfg.dbQueries = database.New(db)
-	apiCfg.platform = os.Getenv("PLATFORM")
-	apiCfg.fileserverHits.Store(0)
+	cfg := apiConfig{}
+	cfg.dbQueries = database.New(db)
+	cfg.platform = os.Getenv("PLATFORM")
+	cfg.tokenSecret = os.Getenv("JWT_SECRET")
+	cfg.fileserverHits.Store(0)
+
+	// Configure routes
 	mux := http.NewServeMux()
-	mux.Handle(appPrefix, appHandler(&apiCfg))
+	mux.Handle(appPrefix, appHandler(&cfg))
+	mux.HandleFunc("GET /admin/metrics", cfg.metricsHandler)
+	mux.HandleFunc("POST /admin/reset", cfg.resetHandler)
+	mux.HandleFunc("GET /api/chirps", cfg.handleGetChirps)
+	mux.HandleFunc("GET /api/chirps/{chirpID}", cfg.handleGetChirpByID)
+	mux.HandleFunc("POST /api/chirps", cfg.handleCreateChirp)
+	mux.HandleFunc("GET /api/healthz", handleHealthz)
+	mux.HandleFunc("POST /api/login", cfg.handleLogin)
+	mux.HandleFunc("POST /api/refresh", cfg.handleRefresh)
+	mux.HandleFunc("POST /api/revoke", cfg.handleRevoke)
+	mux.HandleFunc("POST /api/users", cfg.handleCreateUser)
+
+	// Start the web server
 	server := &http.Server{
 		Addr:    ":" + port,
 		Handler: mux,
 	}
-	mux.HandleFunc("GET /admin/metrics", apiCfg.metricsHandler)
-	mux.HandleFunc("POST /admin/reset", apiCfg.resetHandler)
-	mux.HandleFunc("GET /api/chirps", apiCfg.handleGetChirps)
-	mux.HandleFunc("GET /api/chirps/{chirpID}", apiCfg.handleGetChirpByID)
-	mux.HandleFunc("POST /api/chirps", apiCfg.handleCreateChirp)
-	mux.HandleFunc("GET /api/healthz", handleHealthz)
-	mux.HandleFunc("POST /api/login", apiCfg.handleLogin)
-	mux.HandleFunc("POST /api/users", apiCfg.handleCreateUser)
+
 	log.Printf("Serving files from %s on port: %s\n", appDir, port)
 	log.Fatal(server.ListenAndServe())
 }

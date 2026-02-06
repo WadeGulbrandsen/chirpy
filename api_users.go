@@ -17,6 +17,15 @@ type User struct {
 	Email     string    `json:"email"`
 }
 
+type UserWithToken struct {
+	ID           uuid.UUID `json:"id"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+	Email        string    `json:"email"`
+	Token        string    `json:"token"`
+	RefreshToken string    `json:"refresh_token"`
+}
+
 func (cfg *apiConfig) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
 		Email    string `json:"email"`
@@ -48,6 +57,46 @@ func (cfg *apiConfig) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 	respondWithJSON(w, http.StatusCreated, dbUserToUser(user))
 }
 
+func (cfg *apiConfig) handleRefresh(w http.ResponseWriter, r *http.Request) {
+	type Token struct {
+		Token string `json:"token"`
+	}
+
+	token, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Invalid token", err)
+		return
+	}
+
+	refresh_token, err := cfg.dbQueries.GetRefreshTokenByToken(r.Context(), token)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Invalid token", err)
+		return
+	}
+
+	access_token, err := auth.MakeJWT(refresh_token.UserID, cfg.tokenSecret, time.Hour*1)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Invalid token", err)
+		return
+	}
+	respondWithJSON(w, http.StatusOK, Token{Token: access_token})
+}
+
+func (cfg *apiConfig) handleRevoke(w http.ResponseWriter, r *http.Request) {
+	token, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Invalid token", err)
+		return
+	}
+
+	_, err = cfg.dbQueries.RevokeToken(r.Context(), token)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Invalid token", err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (cfg *apiConfig) handleLogin(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
 		Email    string `json:"email"`
@@ -73,14 +122,45 @@ func (cfg *apiConfig) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	respondWithJSON(w, http.StatusOK, dbUserToUser(user))
+	token, err := auth.MakeJWT(user.ID, cfg.tokenSecret, time.Hour*1)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Invalid email or password", nil)
+		return
+	}
+
+	refresh_token, err := auth.MakeRefreshToken()
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Invalid email or password", nil)
+		return
+	}
+
+	refreshToken, err := cfg.dbQueries.CreateRefreshToken(
+		r.Context(),
+		database.CreateRefreshTokenParams{
+			Token:  refresh_token,
+			UserID: user.ID,
+		},
+	)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Invalid email or password", nil)
+		return
+	}
+
+	respondWithJSON(w, http.StatusOK, UserWithToken{
+		ID:           user.ID,
+		CreatedAt:    user.CreatedAt,
+		UpdatedAt:    user.UpdatedAt,
+		Email:        user.Email,
+		Token:        token,
+		RefreshToken: refreshToken.Token,
+	})
 }
 
-func dbUserToUser(dbUser database.User) User {
+func dbUserToUser(user database.User) User {
 	return User{
-		ID:        dbUser.ID,
-		CreatedAt: dbUser.CreatedAt,
-		UpdatedAt: dbUser.UpdatedAt,
-		Email:     dbUser.Email,
+		ID:        user.ID,
+		CreatedAt: user.CreatedAt,
+		UpdatedAt: user.UpdatedAt,
+		Email:     user.Email,
 	}
 }
